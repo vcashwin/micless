@@ -10,9 +10,10 @@ export type SensorState =
   | { kind: "unavailable" }
   | { kind: "live" };
 
-const CAPACITY = 1024;
+/** 9 minutes at 60 readings a second: long enough to record a sentence played 80 times slower (under 8 minutes) */
+const CAPACITY = 32768;
 
-/** Ring buffer of the last 1024 readings (17 s at 60 a second), one array per axis, newest last. */
+/** Ring buffer of the last CAPACITY readings, one array per axis, newest last. */
 export class Trace {
   readonly x = new Float32Array(CAPACITY);
   readonly y = new Float32Array(CAPACITY);
@@ -20,6 +21,7 @@ export class Trace {
   readonly t = new Float64Array(CAPACITY);
   /** Total samples ever pushed; the newest is at index (count - 1) % CAPACITY */
   count = 0;
+  readonly capacity = CAPACITY;
 
   push(t: number, x: number, y: number, z: number) {
     const i = this.count % CAPACITY;

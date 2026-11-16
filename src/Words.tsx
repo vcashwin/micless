@@ -8,6 +8,7 @@ import heard from "./heard.json";
 import { keptBand, simulate, SPEECH } from "./sim.ts";
 import { decodeWav, encodeWav } from "./wav.ts";
 import { Wave } from "./viz.tsx";
+import { HeardWords, Transcription } from "./Transcription.tsx";
 import s from "./App.module.css";
 
 const RATE = 16000;
@@ -65,8 +66,10 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
       </div>
 
       <div className={s.card}>
-        <div className={s.caption}><span>What Whisper heard</span><span className={s.meta}>speech-to-text on the rebuilt audio</span></div>
-        <Transcript text={transcript} truth={SENTENCE} />
+        <div className={s.caption}><span>What Whisper heard</span><span className={s.meta}>on the rebuilt audio, ahead of time</span></div>
+        <HeardWords text={transcript} truth={SENTENCE} />
+        <Transcription key={`${sensorId}@${slowdown}`} audio={() => rebuilt ?? new Float32Array(0)} label="Run Whisper on it now" truth={SENTENCE}
+          empty="The sentence is still loading." />
         {audio && rebuilt && slowedPreview ? (
           <div className={s.clips}>
             <Clip title="Original" detail={`Apollo 11 · ${seconds.toFixed(1)} s`} samples={audio} color="orange-base" />
@@ -74,6 +77,18 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
             <Clip title="Rebuilt from the sensor" detail="sped back up" samples={rebuilt} color="blue-base" />
           </div>
         ) : <p className={s.muted}>{failed ? "The sentence didn't load. Reload the page to try again." : "Loading the sentence…"}</p>}
+      </div>
+
+      <div className={s.card}>
+        <div className={s.caption}>Try it for real</div>
+        <ol className={s.points}>
+          <li>Open this page on a laptop too, and lay your phone on the laptop, next to its speakers.</li>
+          <li>On the phone, tap <strong>Listen › Start listening</strong>.</li>
+          <li>On the laptop, play the slowed sentence below, all of it.</li>
+          <li>On the phone, tap <strong>Stop listening</strong>, pick {slowdown}× under "Transcribe what it felt" and transcribe.</li>
+        </ol>
+        {dsp && audio ? <PlayFull dsp={dsp} audio={audio} slowdown={slowdown} seconds={seconds} /> : null}
+        <p className={s.small}>Expect little: laptop speakers barely play below 80 Hz, and at {slowdown}× the sentence sits at {Math.round(SPEECH.low / slowdown)} to {Math.round(SPEECH.high / slowdown)} Hz. That is the experiment.</p>
       </div>
 
       <div className={s.card}>
@@ -86,7 +101,7 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
           </li>
           <li>Browsers cap motion sensors near 60 readings a second on purpose, to stop pages listening this way. A device worn on the skull, with a fast sensor and your voice carried by bone, is a different story.</li>
         </ul>
-        <p className={s.small}>The rebuilt clip is a simulation: the sentence filtered to what the chosen sensor can feel at that slowdown, plus sensor noise, computed in WebAssembly on this page. It assumes the speaker and sensor are perfect, which flatters both. Whisper large-v3-turbo transcribed each setting ahead of time; the script is in the repo.</p>
+        <p className={s.small}>The rebuilt clip is a simulation: the sentence filtered to what the chosen sensor can feel at that slowdown, plus sensor noise, computed in WebAssembly on this page. It assumes the speaker and sensor are perfect, which flatters both. Whisper large-v3-turbo transcribed each setting ahead of time (the script is in the repo); "Run Whisper on it now" sends the rebuilt clip to Whisper through Groq.</p>
       </div>
     </section>
   );
@@ -128,19 +143,7 @@ function Bands({ sensorTop, slowdown }: { sensorTop: number; slowdown: number })
   );
 }
 
-function Transcript({ text, truth }: { text: string; truth: string }) {
-  const want = new Set(truth.split(/\s+/).map(norm));
-  const words = text.split(/\s+/).filter(Boolean);
-  const nothing = !words.length || (words.length === 1 && norm(words[0]) === "you");
-  if (nothing) return <p className={s.transcript} data-empty>Nothing. <span className={s.muted}>(Whisper answers “you” to noise.)</span></p>;
-  return (
-    <p className={s.transcript}>
-      {words.map((w, i) => <span key={i} data-wrong={want.has(norm(w)) ? undefined : true}>{w} </span>)}
-    </p>
-  );
-}
-
-function Clip({ title, detail, samples, color }: { title: string; detail: string; samples: Float32Array; color: string }) {
+export function Clip({ title, detail, samples, color }: { title: string; detail: string; samples: Float32Array; color: string }) {
   const [progress, setProgress] = useState(0);
   const [playing, setPlaying] = useState(false);
   const el = useRef<HTMLAudioElement | null>(null);
@@ -172,3 +175,34 @@ function Clip({ title, detail, samples, color }: { title: string; detail: string
     </div>
   );
 }
+
+/** The whole sentence slowed down, for a laptop to play to a phone lying on it. Built on the first tap: 80× is 8 minutes of audio. */
+function PlayFull({ dsp, audio, slowdown, seconds }: { dsp: Dsp; audio: Float32Array; slowdown: number; seconds: number }) {
+  const [built, setBuilt] = useState<{ url: string; slowdown: number } | null>(null);
+  const [time, setTime] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const el = useRef<HTMLAudioElement>(null);
+  useEffect(() => () => { if (built) URL.revokeObjectURL(built.url); }, [built]);
+  const play = () => {
+    const a = el.current!;
+    if (playing) return a.pause();
+    if (built?.slowdown !== slowdown) {
+      // 8 kHz is plenty: slowed 10× or more, nothing is left above 340 Hz
+      const url = URL.createObjectURL(new Blob([encodeWav(dsp.resample(audio, RATE / slowdown, FULL_RATE), FULL_RATE)], { type: "audio/wav" }));
+      setBuilt({ url, slowdown });
+      a.src = url;
+    }
+    // Called inside the tap, so phones and Safari let it play
+    a.play().catch(() => setPlaying(false));
+  };
+  return (
+    <>
+      <Button variant="secondary" size="large" stretched onClick={play} icon={<Icon name={playing ? "MediaPause" : "Speaker"} />}>
+        {playing || time > 0 ? `${duration(time)} of ${duration(seconds * slowdown)}` : `Play the slowed sentence · ${duration(seconds * slowdown)}`}
+      </Button>
+      <audio ref={el} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setTime(0)}
+        onTimeUpdate={e => setTime(e.currentTarget.currentTime)} />
+    </>
+  );
+}
+const FULL_RATE = 8000;

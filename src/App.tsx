@@ -38,7 +38,7 @@ export function App() {
         : tab === "listen" ? <Listen dsp={dsp} onShowWords={() => show("words")} /> : <Words dsp={dsp} />}
 
       <footer className={s.footer}>
-        <p><Icon name="Lock" size={14} color="labelMuted" />Nothing leaves this page. No microphone, no server: the signal processing runs in WebAssembly on your phone.</p>
+        <p><Icon name="Lock" size={14} color="labelMuted" />No microphone, ever. The signal processing runs in WebAssembly on your phone, and your readings stay here until you tap Transcribe: then the audio made from them goes to Whisper on Groq.</p>
         <div className={s.footerActions}>
           <Button variant="secondary" size="medium" href={share} icon={<Icon name="ResourceX" />}>Share on X</Button>
           <Button variant="borderless" size="medium" href={REPO} icon={<Icon name="GitHub" />}>Open source</Button>

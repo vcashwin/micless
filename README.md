@@ -1,6 +1,6 @@
 # Micless
 
-Hear with your phone's motion sensor. Micless reads the accelerometer in the browser and shows what it picks up, live: knocks, music on a speaker, a buzz. It never touches the microphone, and nothing leaves the page.
+Hear with your phone's motion sensor. Micless reads the accelerometer in the browser and shows what it picks up, live: knocks, music on a speaker, a buzz. It never touches the microphone. Your readings stay on the phone until you tap Transcribe.
 
 It also answers the question everyone asks next: can a motion sensor hear words?
 
@@ -19,16 +19,20 @@ Open the site on your phone and tap **Start listening**. On iPhone, allow motion
 - Lay it on a speaker playing music.
 - Press it to your jaw and hum.
 
-The second tab, **Can it hear words?**, works on any device.
+Tap **Stop listening**, then **Transcribe this session**: the readings, turned into audio, go to Whisper and its answer shows up under the button, with the audio it got so you can play it.
+
+The second tab, **Can it hear words?**, works on any device. **Run Whisper on it now** transcribes the simulated sensor recording at the slowdown you picked. **Try it for real** walks you through the video's experiment with a laptop and your phone: the laptop plays the slowed sentence, the phone lies on it and listens, then transcribes with the same speed-up.
 
 ## Run it
 
 ```sh
 npm install
 npm run dev     # http://localhost:5173, and on your network for your phone
-npm test        # the DSP and the detector, on synthetic signals
+npm test        # the DSP, the detector, the recording-to-audio step and the transcription endpoint (Groq stubbed)
 npm run build   # static site in dist/
 ```
+
+Transcription needs a [Groq](https://console.groq.com/keys) key: `GROQ_API_KEY=gsk_… npm run dev`. Without it everything else works, and Transcribe says the key is missing.
 
 A phone only shares its motion sensor with secure pages. To try a dev build on your phone, open it over HTTPS (a tunnel such as `cloudflared tunnel --url http://localhost:5173` works).
 
@@ -36,7 +40,7 @@ A phone only shares its motion sensor with secure pages. To try a dev build on y
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvcashwin%2Fmicless)
 
-Or import the repository on [Vercel](https://vercel.com/new). It is a static Vite site, so there is nothing to configure. The compiled WebAssembly is committed, so the build needs no Rust. Set `SITE_URL` if the site is not served from its Vercel production domain: link cards on X need the absolute address of `og.png`.
+Or import the repository on [Vercel](https://vercel.com/new) and set `GROQ_API_KEY` (as a sensitive variable). It is a Vite site plus one function, `api/transcribe.ts`. The compiled WebAssembly is committed, so the build needs no Rust. Set `SITE_URL` if the site is not served from its Vercel production domain: link cards on X need the absolute address of `og.png`.
 
 ## How it works
 
@@ -44,6 +48,7 @@ A phone's accelerometer measures how the phone shakes. Sound is shaking, so a lo
 
 - **Listening.** Every 100 ms the last second of readings goes through an FFT. Energy below 5 Hz is the phone being moved; energy above 6 Hz is vibration. A sharp jolt between two readings is a tap, and a vibration whose loudness repeats is a beat. The rules and their thresholds are in [`src/listen.ts`](src/listen.ts).
 - **Words.** Speech you can understand sits between 300 and 3,400 Hz, far above 30 Hz. The trick from the MacBook experiment that inspired this: slow the sentence down until it fits under the sensor's limit, play it to the sensor, then speed the recording back up. The page simulates that for a phone in a browser and for the MacBook, using Neil Armstrong's "That's one small step for man, one giant leap for mankind" (NASA, public domain).
+- **Transcription.** `api/transcribe.ts` is the only server code: it holds the Groq key and forwards a 16 kHz WAV to Whisper. It tries `whisper-large-v3-turbo` first and, when that model is rate limited or overloaded, `whisper-large-v3`, which has its own limits. A refused key or bad audio is not retried. Errors come back as one sentence the page shows (both models limited says when to try again). The audio is the axis that shook most, with gravity removed, sped up by the factor you pick (`src/recording.ts`), at most 2 minutes.
 - **WebAssembly.** The FFT, the filters and the resampler are a small Rust crate ([`dsp/`](dsp/)), compiled to a 24 KB `public/dsp.wasm`. Rebuild it with `npm run build:wasm` (needs `rustup target add wasm32-unknown-unknown`).
 
 ### What Whisper heard
