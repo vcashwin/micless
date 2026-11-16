@@ -40,10 +40,11 @@ export function Bars({ barsRef, live }: { barsRef: React.Ref<HTMLDivElement>; li
 /** Min/max waveform of a clip with a playhead */
 export function Wave({ samples, color, progress }: { samples: Float32Array; color: string; progress: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const draw = useRef(() => {});
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    const draw = () => {
+    draw.current = () => {
       const { ctx, width, height } = fit(canvas);
       ctx.clearRect(0, 0, width, height);
       let peak = 1e-6;
@@ -59,10 +60,12 @@ export function Wave({ samples, color, progress }: { samples: Float32Array; colo
         ctx.fillRect(px, y0, 1, Math.max(1, y1 - y0));
       }
     };
-    draw();
-    const observer = new ResizeObserver(draw);
-    observer.observe(canvas);
-    return () => observer.disconnect();
+    draw.current();
   }, [samples, color, progress]);
+  useEffect(() => {
+    const observer = new ResizeObserver(() => draw.current());
+    observer.observe(ref.current!);
+    return () => observer.disconnect();
+  }, []);
   return <canvas ref={ref} className={s.wave} />;
 }

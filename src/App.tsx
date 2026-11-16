@@ -13,7 +13,8 @@ type Tab = "listen" | "words";
 export function App() {
   const [tab, setTab] = useState<Tab>(location.hash === "#words" ? "words" : "listen");
   const [dsp, setDsp] = useState<Dsp | null>(null);
-  useEffect(() => { loadDsp().then(setDsp); }, []);
+  const [dspFailed, setDspFailed] = useState(false);
+  useEffect(() => { loadDsp().then(setDsp, () => setDspFailed(true)); }, []);
   const show = (t: Tab) => { setTab(t); history.replaceState(null, "", t === "words" ? "#words" : location.pathname); scrollTo({ top: 0 }); };
 
   const share = `https://x.com/intent/post?text=${encodeURIComponent("My phone can feel sound without a microphone. Try it:")}&url=${encodeURIComponent(location.origin)}`;
@@ -33,7 +34,8 @@ export function App() {
       <SegmentedControl fullWidth aria-label="View" value={tab} onValueChange={v => show(v as Tab)}
         options={[{ value: "listen", text: "Listen" }, { value: "words", text: "Can it hear words?" }]} />
 
-      {tab === "listen" ? <Listen dsp={dsp} onShowWords={() => show("words")} /> : <Words dsp={dsp} />}
+      {dspFailed ? <p className={s.muted}>This browser couldn't start the WebAssembly that does the signal processing. Try an up-to-date Safari, Chrome or Firefox.</p>
+        : tab === "listen" ? <Listen dsp={dsp} onShowWords={() => show("words")} /> : <Words dsp={dsp} />}
 
       <footer className={s.footer}>
         <p><Icon name="Lock" size={14} color="labelMuted" />Nothing leaves this page. No microphone, no server: the signal processing runs in WebAssembly on your phone.</p>

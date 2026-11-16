@@ -21,8 +21,10 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
   const [audio, setAudio] = useState<Float32Array | null>(null);
   const sensor = SENSORS.find(x => x.id === sensorId)!;
 
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
-    fetch("/one-small-step.wav").then(r => r.arrayBuffer()).then(b => setAudio(decodeWav(new Uint8Array(b))));
+    fetch("/one-small-step.wav").then(r => { if (!r.ok) throw new Error(r.statusText); return r.arrayBuffer(); })
+      .then(b => setAudio(decodeWav(new Uint8Array(b))), () => setFailed(true));
   }, []);
 
   const rebuilt = useMemo(() => (dsp && audio ? simulate(dsp, audio, RATE, { sensorRate: sensor.rate, slowdown }) : null), [dsp, audio, sensor.rate, slowdown]);
@@ -34,7 +36,7 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
 
   const seconds = audio ? audio.length / RATE : 5.85;
   const kept = keptBand({ sensorRate: sensor.rate, slowdown });
-  const fit = slowdownFor(sensor.rate);
+  const exactAt = firstExact(sensorId);
   const transcript = (heard as Record<string, string>)[`${sensorId}@${slowdown}`] ?? "";
 
   return (
@@ -42,16 +44,15 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
       <div className={s.intro}>
         <h2>Can a motion sensor hear words?</h2>
         <p className={s.muted}>
-          Speech you can understand lives between {SPEECH.low} and {SPEECH.high.toLocaleString()} Hz. A sensor read {sensor.rate === 60 ? "60" : "800"} times a second
-          feels only up to {sensor.rate / 2} Hz. The trick from the MacBook experiment: slow the sentence down until it fits, play it to the sensor, then speed
-          the recording back up.
+          Speech you can understand lives between {SPEECH.low} and {SPEECH.high.toLocaleString()} Hz. {sensor.name} feels only up to {sensor.rate / 2} Hz.
+          The trick from the MacBook experiment: slow the sentence down until it fits, play it to the sensor, then speed the recording back up.
         </p>
       </div>
 
       <div className={s.card}>
         <div className={s.caption}>Sensor</div>
         <SegmentedControl fullWidth aria-label="Sensor" value={sensorId} onValueChange={v => setSensorId(v as SensorId)}
-          options={SENSORS.map(x => ({ value: x.id, text: x.id === "phone" ? "Phone browser · 30 Hz" : "MacBook · 200 Hz" }))} />
+          options={SENSORS.map(x => ({ value: x.id, text: x.tab }))} />
         <p className={s.small}>{sensor.note}.</p>
         <div className={s.caption}>Slow the sentence down</div>
         <SegmentedControl fullWidth className={s.tight} aria-label="Slowdown" value={String(slowdown)} onValueChange={v => setSlowdown(Number(v))}
@@ -72,7 +73,7 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
             <Clip title={`Slowed ${slowdown}×, as played`} detail={`first ${PREVIEW} s of ${duration(seconds * slowdown)}`} samples={slowedPreview} color="orange-mid" />
             <Clip title="Rebuilt from the sensor" detail="sped back up" samples={rebuilt} color="blue-base" />
           </div>
-        ) : <p className={s.muted}>Loading the sentence…</p>}
+        ) : <p className={s.muted}>{failed ? "The sentence didn't load. Reload the page to try again." : "Loading the sentence…"}</p>}
       </div>
 
       <div className={s.card}>
@@ -80,8 +81,8 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
         <ul className={s.points}>
           <li>Talking at it, no: at 1× Whisper hears nothing. The video found the same with a MacBook, even with a chin on the palm rest.</li>
           <li>
-            Slowed {fit}× it can, on paper. But the {seconds.toFixed(1)} s sentence then takes {duration(seconds * fit)} to play, at {Math.round(SPEECH.low / fit)} to {Math.round(SPEECH.high / fit)} Hz.
-            {sensorId === "phone" ? " No phone speaker can make sounds that low." : " A MacBook's speakers can just about play that, which is why the video's 40× worked."}
+            Slowed {exactAt}× it can, on paper: that is where Whisper first gets every word. But the {seconds.toFixed(1)} s sentence then takes {duration(seconds * exactAt)} to
+            play, at {Math.round(SPEECH.low / exactAt)} to {Math.round(SPEECH.high / exactAt)} Hz. {sensor.speaker}
           </li>
           <li>Browsers cap motion sensors near 60 readings a second on purpose, to stop pages listening this way. A device worn on the skull, with a fast sensor and your voice carried by bone, is a different story.</li>
         </ul>
@@ -91,8 +92,12 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
   );
 }
 
-/** The smallest offered slowdown that fits all of speech under the sensor's limit */
-const slowdownFor = (rate: number) => SLOWDOWNS.find(k => k * rate / 2 >= SPEECH.high) ?? SLOWDOWNS[SLOWDOWNS.length - 1];
+const norm = (w: string) => w.toLowerCase().replace(/[^a-z']/g, "");
+/** The smallest slowdown at which Whisper heard the sentence word for word */
+const firstExact = (sensor: SensorId) => SLOWDOWNS.find(k => {
+  const text = (heard as Record<string, string>)[`${sensor}@${k}`] ?? "";
+  return text.split(/\s+/).map(norm).join(" ") === SENTENCE.split(/\s+/).map(norm).join(" ");
+}) ?? SLOWDOWNS[SLOWDOWNS.length - 1];
 
 function duration(sec: number) {
   if (sec < 60) return `${sec.toFixed(1)} s`;
@@ -124,7 +129,6 @@ function Bands({ sensorTop, slowdown }: { sensorTop: number; slowdown: number })
 }
 
 function Transcript({ text, truth }: { text: string; truth: string }) {
-  const norm = (w: string) => w.toLowerCase().replace(/[^a-z']/g, "");
   const want = new Set(truth.split(/\s+/).map(norm));
   const words = text.split(/\s+/).filter(Boolean);
   const nothing = !words.length || (words.length === 1 && norm(words[0]) === "you");
@@ -153,7 +157,7 @@ function Clip({ title, detail, samples, color }: { title: string; detail: string
     document.querySelectorAll("audio").forEach(a => a.pause());
     const a = el.current!;
     a.currentTime = 0;
-    void a.play();
+    a.play().catch(() => setPlaying(false));
   };
   return (
     <div className={s.clip}>

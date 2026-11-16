@@ -14,8 +14,9 @@ const NOISE = 0.1;
 
 export function simulate(dsp: Dsp, audio: Float32Array, audioRate: number, { sensorRate, slowdown }: Experiment): Float32Array {
   const effectiveRate = sensorRate * slowdown;
-  if (effectiveRate >= audioRate) return audio.slice();
-  const heard = dsp.resample(audio, audioRate, effectiveRate);
+  // A sensor fast enough for the whole recording keeps all of it, noise included
+  const fast = effectiveRate >= audioRate;
+  const heard = fast ? audio.slice() : dsp.resample(audio, audioRate, effectiveRate);
   const rms = Math.sqrt(audio.reduce((s, v) => s + v * v, 0) / audio.length);
   let seed = 1;
   // ponytail: uniform noise from a fixed-seed LCG, so a given experiment always sounds the same
@@ -23,7 +24,7 @@ export function simulate(dsp: Dsp, audio: Float32Array, audioRate: number, { sen
     seed = (seed * 1664525 + 1013904223) >>> 0;
     heard[i] += (seed / 2 ** 32 - 0.5) * 2 * Math.sqrt(3) * NOISE * rms;
   }
-  return dsp.resample(heard, effectiveRate, audioRate);
+  return fast ? heard : dsp.resample(heard, effectiveRate, audioRate);
 }
 
 /** Highest frequency of the original sentence that survives (Hz) */
@@ -31,6 +32,3 @@ export const keptBand = ({ sensorRate, slowdown }: Experiment) => (sensorRate / 
 
 /** Speech is intelligible from about 300 to 3,400 Hz (the telephone band) */
 export const SPEECH = { low: 300, high: 3400 } as const;
-
-/** The slowdown that fits the whole speech band under the sensor's limit */
-export const slowdownToFit = (sensorRate: number) => Math.ceil(SPEECH.high / (sensorRate / 2));

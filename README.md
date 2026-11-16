@@ -32,7 +32,9 @@ A phone only shares its motion sensor with secure pages. To try a dev build on y
 
 ### Deploy
 
-Import the repository on [Vercel](https://vercel.com/new). It is a static Vite site, so there is nothing to configure. The compiled WebAssembly is committed, so the build needs no Rust. Set `SITE_URL` if the site is not served from its Vercel production domain: link cards on X need the absolute address of `og.png`.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvcashwin%2Fmicless)
+
+Or import the repository on [Vercel](https://vercel.com/new). It is a static Vite site, so there is nothing to configure. The compiled WebAssembly is committed, so the build needs no Rust. Set `SITE_URL` if the site is not served from its Vercel production domain: link cards on X need the absolute address of `og.png`.
 
 ## How it works
 
@@ -49,12 +51,20 @@ A phone's accelerometer measures how the phone shakes. Sound is shaking, so a lo
 | Phone in a browser (feels 30 Hz) | Armstrong | "Seven purple turtles quietly painted the bakery door on Tuesday." |
 |---|---|---|
 | 1× (talking at it) | nothing | nothing |
-| 10× | nothing | nothing |
+| 10× | nothing | "\*Ding\*" |
 | 20× | "At one point, one point…" | "7-4-4-4-4-5-3…" |
 | 40× | "That's one small **trip** for man…" | "**Kevin Cooper Carter** quietly **came to** the bakery door on Tuesday." |
 | 80× and up | exact | exact |
 
 The MacBook sensor from the experiment (responds below about 200 Hz) gets both sentences exactly from 10× on, and nothing at 1×.
+
+To repeat the second column, or try your own sentence:
+
+```sh
+say -o /tmp/s.aiff "Seven purple turtles quietly painted the bakery door on Tuesday."
+ffmpeg -i /tmp/s.aiff -ar 16000 -ac 1 -c:a pcm_s16le /tmp/s.wav
+node scripts/whisper-check.ts /tmp/s.wav
+```
 
 So a phone in a browser could recover a sentence only if it were played to it about 80 times slower than spoken. That turns 5.9 seconds into nearly 8 minutes, at 4 to 42 Hz, which a phone's speaker can't produce. The simulation also assumes a perfect speaker and a sensor that responds evenly right up to its limit, which flatters both.
 

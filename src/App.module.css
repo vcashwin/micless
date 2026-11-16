@@ -57,7 +57,7 @@
 
 .tight [role="tab"] { padding-inline: 2px; min-width: 0; }
 
-.hearing { min-height: 28px; text-align: center; font-size: 20px; font-weight: var(--font-weight-medium); letter-spacing: -0.012em; color: var(--color-label-title); }
+.hearing { min-height: 28px; text-align: center; font-size: var(--font-size-title3); font-weight: var(--font-weight-medium); letter-spacing: -0.012em; color: var(--color-label-title); }
 
 .notice { display: flex; gap: 10px; padding: 12px; border-radius: 8px; background: var(--color-bg-shade); }
 .notice svg { margin-top: 2px; }
@@ -80,7 +80,7 @@
 }
 
 .intro { display: flex; flex-direction: column; gap: 8px; padding: 4px 2px; }
-.intro h2 { font-size: 20px; font-weight: var(--font-weight-semibold); letter-spacing: -0.012em; color: var(--color-label-title); }
+.intro h2 { font-size: var(--font-size-title3); font-weight: var(--font-weight-semibold); letter-spacing: -0.012em; color: var(--color-label-title); }
 
 .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .facts dt { font-size: var(--font-size-mini); color: var(--color-label-muted); }

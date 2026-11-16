@@ -1,6 +1,6 @@
 // Runs the slow-down experiment in simulation for each sensor and slowdown, and asks Whisper what it hears in the result.
 // Writes src/heard.json, which the app shows next to each setting. Needs whisper-cli and a model (WHISPER_MODEL).
-// Usage: node scripts/whisper-check.ts
+// Usage: node scripts/whisper-check.ts [clip.wav]   (16 kHz mono 16-bit; with a clip it only prints, leaving heard.json alone)
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,7 +14,8 @@ const root = new URL("..", import.meta.url).pathname;
 const model = process.env.WHISPER_MODEL ?? join(process.env.HOME!, ".cache/whisper.cpp/ggml-large-v3-turbo.bin");
 const dsp = await loadDsp(readFileSync(join(root, "public/dsp.wasm")));
 
-const audio = decodeWav(readFileSync(join(root, "public/one-small-step.wav")));
+const clip = process.argv[2];
+const audio = decodeWav(readFileSync(clip ?? join(root, "public/one-small-step.wav")));
 
 const dir = mkdtempSync(join(tmpdir(), "micless-"));
 const heard: Record<string, string> = {};
@@ -25,4 +26,4 @@ for (const sensor of SENSORS) for (const slowdown of SLOWDOWNS) {
   heard[`${sensor.id}@${slowdown}`] = text;
   console.log(`${sensor.id} ${slowdown}x: ${text}`);
 }
-writeFileSync(join(root, "src/heard.json"), JSON.stringify(heard, null, 2) + "\n");
+if (!clip) writeFileSync(join(root, "src/heard.json"), JSON.stringify(heard, null, 2) + "\n");

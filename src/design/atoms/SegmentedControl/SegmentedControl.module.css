@@ -26,31 +26,19 @@
   height: 28px;
   padding: 4px 12px;
 }
-.adorned { padding: 4px 8px; }
-.withLabel { padding: 6px 8px; }
 .triggerFullWidth { flex: auto; max-width: none; }
-.trigger:not([data-active]):active:not([data-disabled]) { background-color: var(--color-control-tertiary-hover); color: var(--color-label-base); }
+.trigger:not([data-active]):active { background-color: var(--color-control-tertiary-hover); color: var(--color-label-base); }
 @media (any-hover: hover) and (any-pointer: fine) {
-  .trigger:not([data-active]):hover:not([data-disabled]) { background-color: var(--color-control-tertiary-hover); color: var(--color-label-base); }
+  .trigger:not([data-active]):hover { background-color: var(--color-control-tertiary-hover); color: var(--color-label-base); }
 }
 .trigger:focus-visible { outline: var(--focus-ring-width) solid var(--color-focus-color); outline-offset: calc(-1 * var(--focus-ring-width)); z-index: 1; }
 .trigger[data-active], .trigger[data-active]:active, .trigger[data-active]:hover { background-color: var(--color-control-tertiary-selected); color: var(--color-label-title); }
-/* w.retina (thin-pixel = .5px) / w.standard */
+/* Hairline rings: thinner on retina screens */
 .trigger:not([data-active]) { --btn-overlay-shadow: 0 0 0 var(--thin-pixel) var(--color-bg-border-alpha-thin), var(--shadow-low); --btn-overlay-shadow-hover: 0 0 0 var(--thin-pixel) var(--color-bg-border-solid-alpha-thin), var(--shadow-low); }
 .trigger[data-active] { --btn-overlay-shadow: 0 0 0 var(--thin-pixel) var(--color-bg-border-solid-alpha-thin), 0 0 0 0 transparent; --btn-overlay-shadow-hover: var(--btn-overlay-shadow); }
 @media (max-resolution: 1.99dppx) {
   .trigger:not([data-active]) { --btn-overlay-shadow: 0 0 0 var(--thin-pixel) var(--color-bg-border-alpha), var(--shadow-low); --btn-overlay-shadow-hover: 0 0 0 var(--thin-pixel) var(--color-bg-border-solid-alpha), var(--shadow-low); }
   .trigger[data-active] { --btn-overlay-shadow: 0 0 0 var(--thin-pixel) var(--color-bg-border-solid-alpha), 0 0 0 0 transparent; }
 }
-/* mixins.moreHitArea(2, 2, 2, 2) */
+/* A 2px larger hit area */
 .trigger::before { position: absolute; content: ""; inset: -2px; }
-/* _trigger_1uovr_8: monotone icons follow the text color */
-.trigger svg:not(:global(.color-override)) { fill: currentColor; transition-property: fill; transition-duration: var(--speed-highlightFadeOut); }
-.trigger:not([data-disabled]):is(:active, :hover) svg:not(:global(.color-override)) { transition-duration: var(--speed-highlightFadeIn); }
-/* listBorderless / triggerBorderless + w.borderless: no background, no overlay shadows */
-.borderless { background-color: #0000; }
-.trigger.triggerBorderless { background-color: #0000; --btn-overlay-shadow: none; --btn-overlay-shadow-hover: none; }
-.trigger.triggerBorderless:not([data-active]):active:not([data-disabled]) { background-color: var(--color-control-tertiary-hover); }
-@media (any-hover: hover) and (any-pointer: fine) { .trigger.triggerBorderless:not([data-active]):hover:not([data-disabled]) { background-color: var(--color-control-tertiary-hover); } }
-.trigger.triggerBorderless[data-active] { background-color: var(--color-control-tertiary-selected); }
-.text { font-size: var(--font-size-miniPlus); font-weight: var(--font-weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

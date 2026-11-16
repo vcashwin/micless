@@ -24,9 +24,9 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
   const bars = useRef<HTMLDivElement>(null);
   const scope = useRef<HTMLCanvasElement>(null);
   const spectrogram = useRef<HTMLCanvasElement>(null);
-  const stop = useRef<() => void>(() => {});
+  const running = useRef<AbortController | null>(null);
 
-  useEffect(() => () => stop.current(), []);
+  useEffect(() => () => running.current?.abort(), []);
 
   useEffect(() => {
     if (state.kind !== "live" || !dsp) return;
@@ -34,6 +34,7 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
     const listener = new Listener(dsp, h => setLog(l => [{ ...h, at: h.at - started }, ...l].slice(0, 30)));
     const columns: Float32Array[] = [];
     let frame = 0, lastUpdate = 0, peakDb = -40;
+    const highpassHz = 1;
     const colors = { line: token("label-base"), grid: token("bg-border"), lut: heatmap() };
 
     const loop = (now: number) => {
@@ -46,6 +47,8 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
       setRate(r => (Math.abs(r - snap.rate) > 1 ? snap.rate : r));
       columns.push(snap.spectrum);
       if (columns.length > 120) columns.shift();
+      // The color scale follows the loudest bin, easing down 0.5 dB a tick after it
+      peakDb = Math.max(peakDb - 0.5, ...Array.from(snap.spectrum.subarray(1), p => 10 * Math.log10(p + 1e-9)));
       draw();
     };
 
@@ -56,12 +59,11 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
         ctx.clearRect(0, 0, width, height);
         const n = Math.min(t.count, Math.round(rateNow * SCOPE_SECONDS));
         if (n > 2) {
-          // Draw the axis that is shaking most right now; remove its slow drift (gravity, tilting) with a 1 s moving average
+          // Draw the axis that is shaking most right now, without its slow drift (gravity, tilting)
           const axes = (["x", "y", "z"] as const).map(a => t.last(a, n));
           const energy = axes.map(a => a.reduce((s, v, i) => (i ? s + (v - a[i - 1]) ** 2 : s), 0));
           const a = axes[energy.indexOf(Math.max(...energy))];
-          const w = Math.round(rateNow);
-          const hp = a.map((v, i) => { const from = Math.max(0, i - w); let m = 0; for (let k = from; k <= i; k++) m += a[k]; return v - m / (i - from + 1); });
+          const hp = dsp.highpass(a.map(v => v - a[0]), rateNow, highpassHz, 2);
           const peak = Math.max(0.05, ...hp.map(Math.abs));
           ctx.strokeStyle = colors.grid; ctx.lineWidth = 1;
           ctx.beginPath(); ctx.moveTo(0, height / 2); ctx.lineTo(width, height / 2); ctx.stroke();
@@ -78,29 +80,28 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
         const { ctx, width, height } = fit(spectrogram.current);
         ctx.clearRect(0, 0, width, height);
         const colW = width / 120;
-        let maxDb = -120;
         columns.forEach((col, c) => {
           const x = width - (columns.length - c) * colW;
           for (let k = 1; k < col.length; k++) {
             const db = 10 * Math.log10(col[k] + 1e-9);
-            maxDb = Math.max(maxDb, db);
             const v = Math.max(0, Math.min(1, (db - (peakDb - 45)) / 45));
             ctx.fillStyle = colors.lut[Math.round(v * 255)];
             const y0 = height - (k / (col.length - 1)) * height, h = height / (col.length - 1);
             ctx.fillRect(x, y0, colW + 0.5, h + 0.5);
           }
         });
-        peakDb = Math.max(maxDb, peakDb - 0.05);
       }
     };
     frame = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frame);
   }, [state.kind, dsp]);
 
-  const start = async () => {
-    stop.current();
-    stop.current = await startSensor(trace.current, setState);
+  const start = () => {
+    if (running.current) return;
+    running.current = new AbortController();
+    void startSensor(trace.current, setState, running.current.signal);
   };
+  const starting = state.kind === "asking" || state.kind === "starting";
 
   const live = state.kind === "live";
   const nyquist = Math.round((rate || 60) / 2);
@@ -118,9 +119,9 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
         {live || state.kind === "asking" ? (
           <div className={s.hearing} aria-live="polite">{live ? describe(hearing) : "Waiting for permission…"}</div>
         ) : null}
-        {state.kind === "idle" || state.kind === "asking" ? (
-          <Button variant="primary" size="large" stretched onClick={start} disabled={state.kind === "asking" || !dsp}
-            icon={<Icon name="MobilePhone" />}>Start listening</Button>
+        {state.kind === "idle" || starting ? (
+          <Button variant="primary" size="large" stretched onClick={start} disabled={starting || !dsp}
+            icon={<Icon name="MobilePhone" />}>{state.kind === "starting" ? "Starting…" : "Start listening"}</Button>
         ) : null}
         {state.kind === "denied" ? (
           <Notice icon="Lock" title="Motion access is off">
@@ -129,7 +130,9 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
         ) : null}
         {state.kind === "unavailable" ? (
           <Notice icon="MobilePhone" title="This browser can't feel motion">
-            Open this page on your phone, in Safari or Chrome. Laptops have accelerometers too, but browsers on a Mac don't let a page read the MacBook's.
+            {matchMedia("(pointer: coarse)").matches
+              ? "This browser keeps the motion sensor to itself, as some in-app browsers do. Open the page in Safari or Chrome."
+              : "Open this page on your phone, in Safari or Chrome. Laptops have accelerometers too, but browsers on a Mac don't let a page read the MacBook's."}
             <Button variant="secondary" size="medium" onClick={onShowWords} icon={<Icon name="Sound" />}>Meanwhile: can a sensor hear words?</Button>
           </Notice>
         ) : null}
