@@ -4,6 +4,8 @@ Hear with your phone's motion sensor. Micless reads the accelerometer in the bro
 
 It also answers the question everyone asks next: can a motion sensor hear words?
 
+**Try it on your phone: [micless-app.vercel.app](https://micless-app.vercel.app)**
+
 <p>
   <img src="docs/listen.png" width="300" alt="Listening: bars, the vibration trace and a beat at 121 BPM" />
   <img src="docs/words.png" width="300" alt="Can it hear words: the sentence slowed 40 times, and what Whisper made of it" />
