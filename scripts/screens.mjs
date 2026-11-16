@@ -1,5 +1,5 @@
 // Drives the app in a phone-sized browser with a scripted accelerometer and saves screenshots.
-// Usage: node scripts/screens.mjs [url] [outDir]   (the dev server must be running; browsers come from `npx playwright-core install chromium webkit`)
+// Usage: [VIDEO=dir] [ENGINES=chromium,webkit] node scripts/screens.mjs [url] [outDir]   (the dev server must be running; browsers come from `npx playwright-core install chromium webkit`)
 import { chromium, webkit } from "playwright-core";
 import { mkdirSync } from "node:fs";
 
@@ -27,7 +27,8 @@ const engines = process.env.ENGINES?.split(",") ?? ["chromium"];
 for (const name of engines) {
   const browser = await { chromium, webkit }[name].launch();
   // An iPhone 15 in X's in-app browser: 393 wide, about 660 tall once X's bars are drawn
-  const context = await browser.newContext({ viewport: { width: 393, height: 660 }, deviceScaleFactor: 3, isMobile: name === "chromium", hasTouch: true });
+  const video = process.env.VIDEO ? { dir: process.env.VIDEO, size: { width: 393, height: 660 } } : undefined;
+  const context = await browser.newContext({ viewport: { width: 393, height: 660 }, deviceScaleFactor: 3, isMobile: name === "chromium", hasTouch: true, recordVideo: video });
   // What tapping Allow grants (Chromium asks through DeviceMotionEvent.requestPermission too)
   if (name === "chromium") await context.grantPermissions(["accelerometer", "gyroscope"]);
   const page = await context.newPage();
@@ -61,5 +62,6 @@ for (const name of engines) {
   await page.getByRole("tab", { name: "80×" }).click();
   await page.waitForTimeout(500);
   await page.screenshot({ path: `${out}/${name}-6-words-80.png`, fullPage: true });
+  await context.close();
   await browser.close();
 }
