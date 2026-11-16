@@ -3,7 +3,7 @@ import { Button } from "./design/atoms/Button/Button";
 import { Icon } from "./design/atoms/Icon/Icon";
 import { SegmentedControl } from "./design/atoms/SegmentedControl/SegmentedControl";
 import type { Dsp } from "./dsp.ts";
-import { SENSORS, SLOWDOWNS, type SensorId } from "./experiments.ts";
+import { REAL_SLOWDOWNS, SENSORS, SLOWDOWNS, type SensorId } from "./experiments.ts";
 import heard from "./heard.json";
 import { keptBand, simulate, SPEECH } from "./sim.ts";
 import { decodeWav, encodeWav } from "./wav.ts";
@@ -68,8 +68,9 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
       <div className={s.card}>
         <div className={s.caption}><span>What Whisper heard</span><span className={s.meta}>on the rebuilt audio, ahead of time</span></div>
         <HeardWords text={transcript} truth={SENTENCE} />
-        <Transcription key={`${sensorId}@${slowdown}`} audio={() => rebuilt ?? new Float32Array(0)} label="Run Whisper on it now" truth={SENTENCE}
-          empty="The sentence is still loading." />
+        {rebuilt ? (
+          <Transcription key={`${sensorId}@${slowdown}`} audio={() => rebuilt} label="Run Whisper on it now" truth={SENTENCE} empty="There is no audio to send." />
+        ) : null}
         {audio && rebuilt && slowedPreview ? (
           <div className={s.clips}>
             <Clip title="Original" detail={`Apollo 11 · ${seconds.toFixed(1)} s`} samples={audio} color="orange-base" />
@@ -87,8 +88,14 @@ export function Words({ dsp }: { dsp: Dsp | null }) {
           <li>On the laptop, play the slowed sentence below, all of it.</li>
           <li>On the phone, tap <strong>Stop listening</strong>, pick {slowdown}× under "Transcribe what it felt" and transcribe.</li>
         </ol>
-        {dsp && audio ? <PlayFull dsp={dsp} audio={audio} slowdown={slowdown} seconds={seconds} /> : null}
-        <p className={s.small}>Expect little: laptop speakers barely play below 80 Hz, and at {slowdown}× the sentence sits at {Math.round(SPEECH.low / slowdown)} to {Math.round(SPEECH.high / slowdown)} Hz. That is the experiment.</p>
+        {!(REAL_SLOWDOWNS as readonly number[]).includes(slowdown) ? (
+          <p className={s.small}>Pick a slowdown from {REAL_SLOWDOWNS[0]}× to {REAL_SLOWDOWNS[REAL_SLOWDOWNS.length - 1]}× above to try it: the phone keeps 9 minutes of readings.</p>
+        ) : dsp && audio ? (
+          <>
+            <PlayFull key={slowdown} dsp={dsp} audio={audio} slowdown={slowdown} seconds={seconds} />
+            <p className={s.small}>Expect little: laptop speakers barely play below 80 Hz, and at {slowdown}× the sentence sits at {Math.round(SPEECH.low / slowdown)} to {Math.round(SPEECH.high / slowdown)} Hz. That is the experiment.</p>
+          </>
+        ) : null}
       </div>
 
       <div className={s.card}>
@@ -183,6 +190,8 @@ function PlayFull({ dsp, audio, slowdown, seconds }: { dsp: Dsp; audio: Float32A
   const [playing, setPlaying] = useState(false);
   const el = useRef<HTMLAudioElement>(null);
   useEffect(() => () => { if (built) URL.revokeObjectURL(built.url); }, [built]);
+  // Leaving (or switching slowdown, which remounts this) must silence it: a detached <audio> keeps playing
+  useEffect(() => { const a = el.current; return () => a?.pause(); }, []);
   const play = () => {
     const a = el.current!;
     if (playing) return a.pause();

@@ -10,3 +10,6 @@ export type SensorId = (typeof SENSORS)[number]["id"];
 
 /** Slowdowns offered, from talking at the device (1×) to fitting all of speech under a 60-reading sensor (≈114×) */
 export const SLOWDOWNS = [1, 10, 20, 40, 80, 120, 200] as const;
+
+/** Slowdowns the real experiment offers: the phone keeps 9 minutes of readings, and 80× already plays for nearly 8 */
+export const REAL_SLOWDOWNS = [10, 20, 40, 80] as const;

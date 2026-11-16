@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { POST } from "../api/transcribe.ts";
+import { overLimit, PER_MINUTE, POST } from "../api/transcribe.ts";
 import { encodeWav } from "../src/wav.ts";
 
 const realFetch = globalThis.fetch;
@@ -20,8 +20,9 @@ function groq(answers: Record<string, { status: number; text?: string; retryAfte
   return asked;
 }
 
+let visitor = 0;
 const call = (origin = "https://micless-app.vercel.app") => POST(new Request("https://micless-app.vercel.app/api/transcribe", {
-  method: "POST", headers: { origin, host: "micless-app.vercel.app" }, body: encodeWav(new Float32Array(1600), 16000),
+  method: "POST", headers: { origin, host: "micless-app.vercel.app", "x-real-ip": `10.0.0.${++visitor}` }, body: encodeWav(new Float32Array(1600), 16000),
 }));
 
 test("turbo answers when it can", async () => {
@@ -58,10 +59,28 @@ test("a refused key is not retried on the other model", async () => {
   assert.deepEqual(asked, ["whisper-large-v3-turbo"]);
 });
 
-test("other sites and a missing key are turned away before Groq is called", async () => {
+test("other sites, a missing key and files that aren't WAV are turned away before Groq is called", async () => {
   const asked = groq({});
   assert.equal((await call()).status, 503);
   process.env.GROQ_API_KEY = "k";
   assert.equal((await call("https://evil.example")).status, 403);
+  assert.equal((await call("null")).status, 403);
+  const notWav = await POST(new Request("https://micless-app.vercel.app/api/transcribe", {
+    method: "POST", headers: { origin: "https://micless-app.vercel.app", host: "micless-app.vercel.app" }, body: new Uint8Array(4096) }));
+  assert.equal(notWav.status, 413);
   assert.deepEqual(asked, []);
+});
+
+test("a visitor gets PER_MINUTE transcriptions a minute, then waits", () => {
+  const t0 = 1_000_000;
+  for (let i = 0; i < PER_MINUTE; i++) assert.equal(overLimit("1.2.3.4", t0 + i), false);
+  assert.equal(overLimit("1.2.3.4", t0 + 10), true);
+  assert.equal(overLimit("5.6.7.8", t0 + 10), false);
+  assert.equal(overLimit("1.2.3.4", t0 + 61_000), false);
+});
+
+test("an overloaded turbo (498) also hands the audio to large-v3", async () => {
+  process.env.GROQ_API_KEY = "k";
+  groq({ "whisper-large-v3-turbo": { status: 498 }, "whisper-large-v3": { status: 200, text: "ok" } });
+  assert.equal((await (await call()).json()).model, "whisper-large-v3");
 });

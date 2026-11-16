@@ -28,7 +28,7 @@ export function Transcription({ audio, label, truth, empty }: {
     if (!samples.length) return setJob({ kind: "failed", message: empty });
     setJob({ kind: "sending" });
     try {
-      const res = await fetch("/api/transcribe", { method: "POST", headers: { "content-type": "audio/wav" }, body: encodeWav(samples, AUDIO_RATE) });
+      const res = await fetch("/api/transcribe", { method: "POST", headers: { "content-type": "audio/wav" }, body: encodeWav(samples, AUDIO_RATE), signal: AbortSignal.timeout(60_000) });
       const body = (await res.json().catch(() => null)) as TranscribeOk | TranscribeFailed | null;
       if (body && "text" in body) setJob({ kind: "done", result: body });
       else setJob({ kind: "failed", message: body?.error ?? `The transcription service answered ${res.status}.` });
