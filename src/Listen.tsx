@@ -98,8 +98,16 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
 
   const start = () => {
     if (running.current) return;
+    setLog([]);
     running.current = new AbortController();
     void startSensor(trace.current, setState, running.current.signal);
+  };
+  const stop = () => {
+    running.current?.abort();
+    running.current = null;
+    bars.current?.style.setProperty("--level", "0");
+    setHearing({ kind: "quiet" });
+    setState({ kind: "idle" });
   };
   const starting = state.kind === "asking" || state.kind === "starting";
 
@@ -123,6 +131,7 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
           <Button variant="primary" size="large" stretched onClick={start} disabled={starting || !dsp}
             icon={<Icon name="MobilePhone" />}>{state.kind === "starting" ? "Starting…" : "Start listening"}</Button>
         ) : null}
+        {live ? <Button variant="secondary" size="large" stretched onClick={stop} icon={<Icon name="Stop" />}>Stop listening</Button> : null}
         {state.kind === "denied" ? (
           <Notice icon="Lock" title="Motion access is off">
             Reload the page and tap Allow when your phone asks. On iPhone, that question only comes once per visit.
