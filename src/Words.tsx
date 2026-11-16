@@ -161,7 +161,7 @@ function Clip({ title, detail, samples, color }: { title: string; detail: string
   };
   return (
     <div className={s.clip}>
-      <Button variant="secondary" size="medium" onlyIcon aria-label={playing ? `Stop ${title}` : `Play ${title}`} onClick={toggle}
+      <Button variant="secondary" size="medium" onlyIcon aria-label={playing ? `Stop ${title}` : `Play ${title}`} onClick={toggle} disabled={!url}
         icon={<Icon name={playing ? "MediaPause" : "MediaPlay"} />} />
       <div className={s.clipBody}>
         <div className={s.clipTitle}><span>{title}</span><span className={s.meta}>{detail}</span></div>
