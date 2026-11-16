@@ -3,3 +3,4 @@ dist
 dsp/target
 .vercel
 screens
+.env*

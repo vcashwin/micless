@@ -1,13 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./design/atoms/Button/Button";
+import { SegmentedControl } from "./design/atoms/SegmentedControl/SegmentedControl";
 import { Icon, type IconName } from "./design/atoms/Icon/Icon";
 import type { Dsp } from "./dsp.ts";
 import { describe, Listener, type Heard, type Hearing } from "./listen.ts";
+import { REAL_SLOWDOWNS } from "./experiments.ts";
+import { MAX_AUDIO_SECONDS, sensorAudio } from "./recording.ts";
 import { startSensor, Trace, type SensorState } from "./sensor.ts";
+import { Transcription } from "./Transcription.tsx";
+import { Clip } from "./Words.tsx";
 import { Bars, fit, token } from "./viz.tsx";
 import s from "./App.module.css";
 
 const SCOPE_SECONDS = 5;
+/** Speed-ups offered for transcription: none, and the slowdowns the real experiment plays */
+const SPEEDUPS = [1, ...REAL_SLOWDOWNS];
 
 const TIPS: { icon: IconName; text: string; detail: string }[] = [
   { icon: "Bolt", text: "Tap the back twice", detail: "A knock is a sharp jolt. It shows up clearly." },
@@ -25,8 +32,22 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
   const scope = useRef<HTMLCanvasElement>(null);
   const spectrogram = useRef<HTMLCanvasElement>(null);
   const running = useRef<AbortController | null>(null);
+  /** Trace position where this listening session began: what Transcribe sends */
+  const [sessionFrom, setSessionFrom] = useState<number | null>(null);
+  const [speedup, setSpeedup] = useState(1);
+  const [sent, setSent] = useState<Float32Array | null>(null);
 
   useEffect(() => () => running.current?.abort(), []);
+
+  // A phone lying still for minutes locks its screen, and a locked phone stops sending motion: keep it awake while listening
+  useEffect(() => {
+    if (state.kind !== "live" || !("wakeLock" in navigator)) return;
+    let lock: WakeLockSentinel | null = null, gone = false;
+    const take = () => { if (document.visibilityState === "visible") navigator.wakeLock.request("screen").then(l => { if (gone) void l.release(); else lock = l; }, () => {}); };
+    take();
+    document.addEventListener("visibilitychange", take);
+    return () => { gone = true; document.removeEventListener("visibilitychange", take); void lock?.release(); };
+  }, [state.kind]);
 
   useEffect(() => {
     if (state.kind !== "live" || !dsp) return;
@@ -99,6 +120,8 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
   const start = () => {
     if (running.current) return;
     setLog([]);
+    setSent(null);
+    setSessionFrom(trace.current.count);
     running.current = new AbortController();
     void startSensor(trace.current, setState, running.current.signal);
   };
@@ -146,6 +169,21 @@ export function Listen({ dsp, onShowWords }: { dsp: Dsp | null; onShowWords: () 
           </Notice>
         ) : null}
       </div>
+
+      {sessionFrom !== null && dsp && (live || state.kind === "idle") ? (
+        <div className={s.card}>
+          <div className={s.caption}><span>Transcribe what it felt</span><span className={s.meta}>Whisper, through Groq</span></div>
+          <p className={s.small}>
+            Turns this session's readings into audio and sends it to Whisper (at most {MAX_AUDIO_SECONDS / 60} minutes of it). Use 1× for anything that happened
+            by the phone. If a laptop played it the slowed sentence (Can it hear words? › Try it for real), pick the same slowdown to speed it back up.
+          </p>
+          <SegmentedControl fullWidth aria-label="Speed up" value={String(speedup)} onValueChange={v => { setSpeedup(Number(v)); setSent(null); }}
+            options={SPEEDUPS.map(k => ({ value: String(k), text: `${k}×` }))} />
+          <Transcription key={`${sessionFrom}@${speedup}`} label="Transcribe this session" empty="Listen for at least a second first."
+            audio={() => { const a = sensorAudio(dsp, trace.current, sessionFrom, speedup); setSent(a.length ? a : null); return a; }} />
+          {sent ? <Clip title="What Whisper got" detail={`${(sent.length / 16000).toFixed(1)} s`} samples={sent} color="blue-base" /> : null}
+        </div>
+      ) : null}
 
       {live ? (
         <>

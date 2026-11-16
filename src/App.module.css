@@ -104,6 +104,11 @@
 .transcript[data-empty] { color: var(--color-label-title); }
 .transcript[data-empty] .muted { display: inline; font-size: var(--font-size-small); font-weight: var(--font-weight-normal); }
 
+.transcription { display: flex; flex-direction: column; gap: 12px; }
+.result { display: flex; flex-direction: column; gap: 4px; }
+.error { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; background: var(--color-red-tint); color: var(--color-red-text); font-size: var(--font-size-small); line-height: 1.45; }
+.error svg { margin-top: 2px; }
+
 .clips { display: flex; flex-direction: column; gap: 14px; }
 .clip { display: flex; align-items: center; gap: 12px; }
 .clipBody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
