@@ -1,0 +1,14 @@
+/* fill flows through --icon-color so parents can recolor via --icon-replacement-color. */
+.icon {
+  --icon-color: var(--icon-replacement-color, var(--icon-default-color));
+  fill: var(--icon-color);
+  transition-property: fill;
+  transition-duration: inherit;
+  flex-shrink: 0;
+}
+/* markers.stylex hover marker: hovering an interactive parent brightens its icons. */
+@media (any-hover: hover) and (any-pointer: fine) {
+  :global([data-icon-hover]:hover:not(:disabled)) .icon { fill: var(--color-label-title); }
+}
+:global([data-icon-hover]:active:not(:disabled)) .icon,
+:global([data-icon-hover][data-active="true"]:not(:disabled)) .icon { fill: var(--color-label-title); }
