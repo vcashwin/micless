@@ -39,6 +39,8 @@ const TUNING = {
 };
 
 const FFT = 64;
+/** Seconds of vibration envelope the beat detector looks at: long enough for 3 beats at 60 BPM, short enough to forget the silence before the music */
+const BEAT_SECONDS = 4;
 const DB_RANGE = 20;
 
 export class Listener {
@@ -50,7 +52,7 @@ export class Listener {
   private shown: Hearing = { kind: "quiet" };
   private shownUntil = 0;
   private nextId = 1;
-  /** Jerk energy per reading over the last 8 s, for the beat detector */
+  /** Jerk energy per reading over the last BEAT_SECONDS, for the beat detector */
   private envelope: number[] = [];
 
   private dsp: Dsp;
@@ -75,7 +77,7 @@ export class Listener {
       const last = this.taps[this.taps.length - 1] ?? -Infinity;
       if (j > Math.max(TUNING.tapMin, this.floor * TUNING.tapOverFloor) && t - last > TUNING.tapRefractoryMs) this.taps.push(t);
     }
-    const keep = Math.round(rate * 8);
+    const keep = Math.round(rate * BEAT_SECONDS);
     if (this.envelope.length > keep) this.envelope.splice(0, this.envelope.length - keep);
 
     const spectrum = new Float32Array(FFT / 2 + 1);
@@ -111,9 +113,12 @@ export class Listener {
   }
 
   private decide(now: number, f: { sustained: boolean; motion: number; vibration: number; peakHz: number; rate: number }): Hearing {
-    // Taps settle once no further tap can join them
+    // Jolts inside a sustained sound are the sound, not taps
+    if (f.sustained) this.taps = [];
+    // Taps settle once no further tap can join them; until then the knock's broad jolt says nothing else
     const lastTap = this.taps[this.taps.length - 1];
-    if (lastTap != null && now - lastTap > TUNING.multiTapMs) {
+    if (lastTap != null && now - lastTap <= TUNING.multiTapMs) return this.shown;
+    if (lastTap != null) {
       const count = this.taps.length;
       this.taps = [];
       if (!f.sustained) return this.show({ kind: "tap", count }, now, 900);

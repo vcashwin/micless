@@ -1,5 +1,4 @@
 import type { ButtonHTMLAttributes, MouseEvent, MouseEventHandler, ReactNode, Ref } from "react";
-import { Icon } from "../Icon/Icon";
 import s from "./Button.module.css";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "borderless" | "muted" | "dangerous-borderless" | "link" | "dangerous" | "circle" | "tab";
@@ -8,7 +7,7 @@ export type ButtonSize = "small" | "medium" | "normal" | "large";
 export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
-  /** Leading (or trailing with rightAlignIcon) icon element, e.g. <Icon name="Project" /> */
+  /** Leading (or trailing with rightAlignIcon) icon element, e.g. <Icon name="GitHub" /> */
   icon?: ReactNode;
   /** Force 14px or 16px icon box; default 14 for small/medium, 16 otherwise */
   iconSize?: 14 | 16;
@@ -16,7 +15,6 @@ export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> 
   /** Icons inherit the text color (default true) */
   monotoneIcon?: boolean;
   rightAlignIcon?: boolean;
-  showCaret?: boolean;
   /** Selected/pressed state (data-active) */
   active?: boolean;
   stretched?: boolean;
@@ -42,7 +40,7 @@ const recolorsIcon = (v: ButtonVariant) => ["ghost", "borderless", "muted", "dan
 
 export function Button({
   variant = "primary", size = "normal", icon, iconSize, iconContainerSize = "default", monotoneIcon = true,
-  rightAlignIcon = false, showCaret = false, active = false, stretched, noInvisiblePadding = false, onlyIcon,
+  rightAlignIcon = false, active = false, stretched, noInvisiblePadding = false, onlyIcon,
   underlay, onMiddleClick, onClick, onAuxClick, type = "button", className, children, ref, href, ...rest
 }: ButtonProps) {
   const isOnlyIcon = !children || !!onlyIcon;
@@ -77,7 +75,6 @@ export function Button({
       {rightAlignIcon ? null : iconEl}
       {onlyIcon ? null : children}
       {rightAlignIcon ? iconEl : null}
-      {showCaret && <Icon name="ButtonCaret" width={13} height={9} color={variant === "primary" || variant === "dangerous" ? "currentColor" : "labelMuted"} className={s.caret} aria-hidden />}
     </button>
   );
 }

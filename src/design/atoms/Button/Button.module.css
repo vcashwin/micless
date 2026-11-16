@@ -139,5 +139,3 @@
 .iconContent { max-width: unset; width: auto; height: auto; padding: 0; }
 .iconContent svg { width: auto; height: auto; }
 
-/* caret (R.caret) */
-.caret { transition-property: transform; transition-duration: .1s; transition-timing-function: ease-in-out; margin-left: var(--contextual-menu-actions-caret-gap); width: 8px; }

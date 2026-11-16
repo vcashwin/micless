@@ -49,3 +49,10 @@ test("a buzz pulsing twice a second is a beat near 120 BPM", () => {
 test("tilting the phone slowly is moving, not sound", () => {
   assert.equal(run(6, after(2, t => 2 * Math.sin(2 * Math.PI * 1 * t))).last, "Moving");
 });
+
+test("music that starts after a double tap and then stops is heard as a tap, a sound and a beat, never as taps or moving", () => {
+  const knocks = (t: number) => spike(2)(t) + spike(2.25)(t);
+  const music = (t: number) => (t > 4 && t < 12 && t % 0.5 < 0.15 ? 0.4 * Math.sin(2 * Math.PI * 22 * t) : 0);
+  const { heard } = run(14, t => knocks(t) + music(t));
+  assert.deepEqual(heard, ["Double tap", "Vibration · 22 Hz", "Beat · 120 BPM"]);
+});
